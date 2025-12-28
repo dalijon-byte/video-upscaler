@@ -14,8 +14,8 @@ Diffusion-based video super-resolution (VSR) methods achieve strong perceptual q
 #### Conda setup
 ```
 git clone https://github.com/jamichss/Stream-DiffVSR.git
-cd AR-DiffVSR
-conda env create -f requirements.yaml
+cd Stream-DiffVSR
+conda env create -f requirements.yml
 conda activate stream-diffvsr
 ```
 ### Pretrained models
