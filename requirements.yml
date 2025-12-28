@@ -44,7 +44,7 @@ dependencies:
       - colorama==0.4.6
       - coloredlogs==15.0.1
       - contourpy==1.3.0
-      - controlnet-aux==0.0.9
+      - controlnet-aux
       - crcmod==1.7
       - cryptography==44.0.1
       - cuda-python==12.6.2.post1
