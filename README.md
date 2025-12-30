@@ -2,6 +2,10 @@
 
 **Authors:** Hau-Shiang Shiu, Chin-Yang Lin, Zhixiang Wang, Chi-Wei Hsiao, Po-Fan Yu, Yu-Chih Chen, Yu-Lun Liu
 
+<a href='https://jamichss.github.io/stream-diffvsr-project-page/'><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;
+<a href="https://huggingface.co/Jamichsu/Stream-DiffVSR"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20(v1)-blue"></a> &nbsp;
+<a href="https://arxiv.org/abs/2512.23709"><img src="https://img.shields.io/badge/arXiv-2510.12747-b31b1b.svg"></a>
+
 ### TODO
 
 - ✅ Release inference code and model weights  
@@ -21,6 +25,24 @@ conda activate stream-diffvsr
 ### Pretrained models
 Pretrained models are available [here](https://huggingface.co/Jamichsu/Stream-DiffVSR). You don't need to download them explicitly as they are fetched with inference code.
 ### Inference
+You can run the inference directly using the following command. No manual download of checkpoints is required, as the inference script will automatically fetch the necessary files.
 ```
-bash test_auto_temporal_decoder.sh
+python inference.py \
+    --model_id 'Jamichsu/Stream-DiffVSR' \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --in_path 'YOUR_INPUT_PATH' \
+    --num_inference_steps 4
+```
+For additional acceleration using NVIDIA TensorRT, please execute the following command. Please note that utilizing TensorRT may introduce a slight degradation in the output quality while providing significant performance gains. 
+
+When executing the TensorRT command for the first time with a new input resolution, you may observe that the process takes an extended period to build the dedicated TensorRT engine. We kindly ask for your patience. Please note that this engine compilation is a one-time setup step for that specific resolution, essential for enabling subsequent accelerated inference at the same setting.
+```
+python inference.py \
+    --model_id 'Jamichsu/Stream-DiffVSR' \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --in_path 'YOUR_INPUT_PATH' \
+    --num_inference_steps 4 \
+    --enable_tensorrt \
+    --image_height <YOUR_TARGET_HEIGHT> \
+    --image_width <YOUR_TARGET_WIDTH>
 ```
