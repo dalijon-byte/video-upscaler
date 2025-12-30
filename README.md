@@ -35,7 +35,6 @@ python inference.py \
 ```
 For additional acceleration using NVIDIA TensorRT, please execute the following command. Please note that utilizing TensorRT may introduce a slight degradation in the output quality while providing significant performance gains. 
 
-When executing the TensorRT command for the first time with a new input resolution, you may observe that the process takes an extended period to build the dedicated TensorRT engine. We kindly ask for your patience. Please note that this engine compilation is a one-time setup step for that specific resolution, essential for enabling subsequent accelerated inference at the same setting.
 ```
 python inference.py \
     --model_id 'Jamichsu/Stream-DiffVSR' \
@@ -46,3 +45,5 @@ python inference.py \
     --image_height <YOUR_TARGET_HEIGHT> \
     --image_width <YOUR_TARGET_WIDTH>
 ```
+
+When executing the TensorRT command for the first time with a new input resolution, you may observe that the process takes an extended period to build the dedicated TensorRT engine. We kindly ask for your patience. Please note that this engine compilation is a one-time setup step for that specific resolution, essential for enabling subsequent accelerated inference at the same setting.
