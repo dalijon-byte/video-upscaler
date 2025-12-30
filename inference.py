@@ -18,7 +18,7 @@ from temporal_autoencoder.autoencoder_tiny import TemporalAutoencoderTiny
 torch.backends.cuda.matmul.allow_tf32 = True
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Test code for StableVSR.")
+    parser = argparse.ArgumentParser(description="Test code for Stream-DiffVSR.")
     parser.add_argument("--model_id", default='stabilityai/stable-diffusion-x4-upscaler', type=str, help="model_id of the model to be tested.")
     parser.add_argument("--unet_pretrained_weight", type=str, help="UNet pretrained weight.")
     parser.add_argument("--controlnet_pretrained_weight", type=str, help="ControlNet pretrained weight.")
