@@ -15,7 +15,7 @@
 Diffusion-based video super-resolution (VSR) methods achieve strong perceptual quality but remain impractical for latency-sensitive settings due to reliance on future frames and expensive multi-step denoising. We propose Stream-DiffVSR, a causally conditioned diffusion framework for efficient online VSR. Operating strictly on past frames, it combines a four-step distilled denoiser for fast inference, an Auto-regressive Temporal Guidance (ARTG) module injecting motion-aligned cues during latent denoising, and a lightweight temporal-aware decoder with a Temporal Processor Module (TPM) enhancing detail and temporal coherence. Stream-DiffVSR processes 720p frames in 0.328 seconds on an RTX4090 GPU and significantly outperforms prior diffusion-based methods. Compared with the online SOTA TMP~\citep{zhang2024tmp}, it boosts perceptual quality (LPIPS +0.095) while reducing latency by over 130X. Stream-DiffVSR achieves the lowest latency reported for diffusion-based VSR reducing initial delay from over 4600 seconds to 0.328 seconds, thereby making it the first diffusion VSR method suitable for low-latency online deployment.
 
 ## Usage
-#### Conda setup
+### Conda setup
 ```
 git clone https://github.com/jamichss/Stream-DiffVSR.git
 cd Stream-DiffVSR
@@ -59,3 +59,6 @@ python inference.py \
 ```
 
 When executing the TensorRT command for the first time with a new input resolution, you may observe that the process takes an extended period to build the dedicated TensorRT engine. We kindly ask for your patience. Please note that this engine compilation is a one-time setup step for that specific resolution, essential for enabling subsequent accelerated inference at the same setting.
+
+## Acknowledgement
+This project is made possible by these works: [StreamDiffusion](https://github.com/cumulo-autumn/StreamDiffusion), [StableVSR](https://github.com/claudiom4sir/StableVSR) and [TAESD](https://github.com/madebyollin/taesd). We thank all the authors for their great repos.
