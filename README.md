@@ -51,6 +51,8 @@ YOUR_INPUT_PATH/
 ```
 For additional acceleration using NVIDIA TensorRT, please execute the following command. Please note that utilizing TensorRT may introduce a slight degradation in the output quality while providing significant performance gains. Parameters image_height and image_width are required when using tensorRT; otherwise, they are not needed.
 
+**Note:** **TensorRT** is mainly for speed/throughput, while **xFormers** helps reduce GPU memory usage. They are currently not compatible, so xFormers-based memory optimizations are unavailable when TensorRT is enabled, which may significantly increase GPU memory usage and lead to OOM issues at higher resolutions.
+
 ```
 python inference.py \
     --model_id 'Jamichsu/Stream-DiffVSR' \
