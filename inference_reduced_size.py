@@ -80,6 +80,13 @@ def parse_args():
     parser.add_argument("--reduce_output_size", action='store_true', help="Reduce output size after upscaling")
     parser.add_argument("--output_scale_factor", type=float, default=0.5, help="Scale factor for output reduction")
     
+    # Video-only mode
+    parser.add_argument("--only_video", action='store_true', help="Only create video from existing frames (skip upscaling)")
+    parser.add_argument("--frames_dir", type=str, help="Directory containing frames (required for --only_video)")
+    parser.add_argument("--video_width", type=int, help="Output video width (optional for --only_video, will be detected from first frame)")
+    parser.add_argument("--video_height", type=int, help="Output video height (optional for --only_video, will be detected from first frame)")
+    parser.add_argument("--video_fps", type=float, default=24.0, help="Output video FPS (for --only_video)")
+    
     return parser.parse_args()
 
 def load_component(cls, weight_path, model_id, subfolder, torch_dtype=None):
@@ -90,10 +97,11 @@ def load_component(cls, weight_path, model_id, subfolder, torch_dtype=None):
         kwargs["torch_dtype"] = torch_dtype
     return cls.from_pretrained(path, **kwargs)
 
-def process_frames_in_batches(pipeline, frames, of_model, num_inference_steps, batch_size, target_path, 
+def process_frames_in_batches(pipeline, frames, of_model, num_inference_steps, batch_size, target_path,
                              of_rescale_factor=4, output_scale_factor=1.0):
     """Process frames in batches, optionally reducing output size."""
     all_hr_frames = []
+    frames_saved = 0
     
     for batch_start in range(0, len(frames), batch_size):
         batch_end = min(batch_start + batch_size, len(frames))
@@ -101,39 +109,62 @@ def process_frames_in_batches(pipeline, frames, of_model, num_inference_steps, b
         
         print(f"Processing batch {batch_start//batch_size + 1}/{(len(frames) + batch_size - 1)//batch_size}: frames {batch_start}-{batch_end-1}")
         
-        output = pipeline(
-            '', batch_frames,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=0,
-            of_model=of_model,
-            of_rescale_factor=of_rescale_factor
-        )
-        
-        batch_hr_frames = [frame[0] for frame in output.images]
-        
-        # Reduce output size if requested
-        if output_scale_factor != 1.0:
-            print(f"  Reducing output size by factor {output_scale_factor}")
-            resized_frames = []
-            for frame in batch_hr_frames:
-                new_width = int(frame.width * output_scale_factor)
-                new_height = int(frame.height * output_scale_factor)
-                resized_frame = frame.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                resized_frames.append(resized_frame)
-            batch_hr_frames = resized_frames
-        
-        all_hr_frames.extend(batch_hr_frames)
-        
-        # Save frames immediately to free memory
-        for i, frame in enumerate(batch_hr_frames):
-            frame_idx = batch_start + i
-            frame_name = f"frame_{frame_idx:04d}.png"
-            frame.save(os.path.join(target_path, frame_name))
-        
-        # Clear memory
-        del output
-        del batch_hr_frames
-        torch.cuda.empty_cache()
+        try:
+            output = pipeline(
+                '', batch_frames,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=0,
+                of_model=of_model,
+                of_rescale_factor=of_rescale_factor
+            )
+            
+            if not hasattr(output, 'images') or not output.images:
+                print(f"  Warning: No images in pipeline output")
+                continue
+                
+            batch_hr_frames = [frame[0] for frame in output.images]
+            
+            # Reduce output size if requested
+            if output_scale_factor != 1.0:
+                print(f"  Reducing output size by factor {output_scale_factor}")
+                resized_frames = []
+                for frame in batch_hr_frames:
+                    new_width = int(frame.width * output_scale_factor)
+                    new_height = int(frame.height * output_scale_factor)
+                    resized_frame = frame.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    resized_frames.append(resized_frame)
+                batch_hr_frames = resized_frames
+            
+            all_hr_frames.extend(batch_hr_frames)
+            
+            # Save frames immediately to free memory
+            for i, frame in enumerate(batch_hr_frames):
+                frame_idx = batch_start + i
+                frame_name = f"frame_{frame_idx:04d}.png"
+                frame_path = os.path.join(target_path, frame_name)
+                frame.save(frame_path)
+                frames_saved += 1
+                
+                # Print progress every 10 frames
+                if frames_saved % 10 == 0:
+                    print(f"  Saved {frames_saved}/{len(frames)} frames")
+            
+            # Clear memory
+            del output
+            del batch_hr_frames
+            torch.cuda.empty_cache()
+            
+        except Exception as e:
+            print(f"  Error processing batch: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+    
+    print(f"Total frames saved: {frames_saved}/{len(frames)}")
+    
+    # Check if any frames were saved
+    if frames_saved == 0:
+        print("Warning: No frames were saved during processing!")
     
     return all_hr_frames
 
@@ -149,20 +180,65 @@ def create_video_from_frames(frames_dir, output_video_path, fps, width, height, 
     
     print(f"Creating video from {len(frame_files)} frames ({width}x{height})...")
     
+    # Check first frame dimensions
+    first_frame_path = os.path.join(frames_dir, frame_files[0])
+    first_frame = cv2.imread(first_frame_path)
+    if first_frame is None:
+        print(f"Error: Could not read first frame {first_frame_path}")
+        return False
+    
+    actual_height, actual_width = first_frame.shape[:2]
+    if actual_width != width or actual_height != height:
+        print(f"Warning: Frame dimensions mismatch!")
+        print(f"  Expected: {width}x{height}")
+        print(f"  Actual: {actual_width}x{actual_height}")
+        print(f"  Adjusting video dimensions to match frames...")
+        width, height = actual_width, actual_height
+    
     # Create video from frames using OpenCV
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
     
+    if not video_writer.isOpened():
+        print(f"Error: Could not open video writer for {output_video_path}")
+        print(f"  Codec: mp4v, Dimensions: {width}x{height}, FPS: {fps}")
+        return False
+    
+    frames_written = 0
     for frame_file in frame_files:
         frame_path = os.path.join(frames_dir, frame_file)
         frame = cv2.imread(frame_path)
         if frame is None:
             print(f"Warning: Could not read frame {frame_file}")
             continue
+        
+        # Ensure frame has correct dimensions
+        if frame.shape[1] != width or frame.shape[0] != height:
+            print(f"Warning: Frame {frame_file} has wrong dimensions {frame.shape[1]}x{frame.shape[0]}, resizing to {width}x{height}")
+            frame = cv2.resize(frame, (width, height))
+        
         video_writer.write(frame)
+        frames_written += 1
     
     video_writer.release()
-    print(f"Video created: {output_video_path}")
+    
+    if frames_written == 0:
+        print(f"Error: No frames were written to video")
+        if os.path.exists(output_video_path):
+            os.remove(output_video_path)
+        return False
+    
+    # Check if video file was created and has reasonable size
+    if os.path.exists(output_video_path):
+        file_size = os.path.getsize(output_video_path)
+        print(f"Video created: {output_video_path} ({file_size:,} bytes, {frames_written} frames)")
+        
+        if file_size < 1024:  # Less than 1KB is suspicious
+            print(f"Warning: Video file is too small ({file_size} bytes). Something may be wrong.")
+            return False
+    else:
+        print(f"Error: Video file was not created: {output_video_path}")
+        return False
     
     # If original video has audio, extract and merge it
     if original_video_path and os.path.exists(original_video_path):
@@ -217,6 +293,71 @@ def main():
     for arg, value in vars(args).items():
         print(f"  {arg}: {value}")
 
+    # Handle --only_video mode
+    if args.only_video:
+        if not args.frames_dir:
+            print("Error: --frames_dir is required for --only_video mode")
+            return
+        
+        # Get frame dimensions from first frame if not provided
+        video_width = args.video_width
+        video_height = args.video_height
+        
+        if not video_width or not video_height:
+            print(f"Detecting frame dimensions from first frame in {args.frames_dir}...")
+            
+            # Find first PNG frame
+            frame_files = sorted([f for f in os.listdir(args.frames_dir) if f.endswith('.png')])
+            if not frame_files:
+                print(f"Error: No PNG frames found in {args.frames_dir}")
+                return
+            
+            first_frame_path = os.path.join(args.frames_dir, frame_files[0])
+            first_frame = cv2.imread(first_frame_path)
+            if first_frame is None:
+                print(f"Error: Could not read first frame {first_frame_path}")
+                return
+            
+            detected_height, detected_width = first_frame.shape[:2]
+            
+            if not video_width:
+                video_width = detected_width
+                print(f"  Detected width: {video_width}")
+            
+            if not video_height:
+                video_height = detected_height
+                print(f"  Detected height: {video_height}")
+        
+        print(f"\nCreating video from existing frames in {args.frames_dir}")
+        print(f"Video dimensions: {video_width}x{video_height}")
+        print(f"Video FPS: {args.video_fps}")
+        
+        # Generate output video path
+        if args.in_path:
+            video_name = os.path.splitext(os.path.basename(args.in_path))[0]
+        else:
+            video_name = os.path.basename(args.frames_dir.rstrip('/'))
+        
+        # Ensure output directory exists
+        os.makedirs(args.out_path, exist_ok=True)
+        
+        output_video_path = os.path.join(args.out_path, f"{video_name}_from_frames_{video_width}x{video_height}.mp4")
+        
+        # Create video from frames
+        success = create_video_from_frames(
+            args.frames_dir, output_video_path, args.video_fps,
+            video_width, video_height, args.in_path
+        )
+        
+        if success:
+            print(f"\n✅ Video creation complete!")
+            print(f"   Video saved: {output_video_path}")
+        else:
+            print(f"\n❌ Video creation failed")
+        
+        return
+
+    # Normal processing mode (with upscaling)
     set_seed(42)
     device = torch.device('cuda')
     
@@ -241,8 +382,8 @@ def main():
     
     # Extract frames (with optional resizing)
     frames, fps, width, height = extract_frames_from_video(
-        args.in_path, 
-        target_width=input_target_width, 
+        args.in_path,
+        target_width=input_target_width,
         target_height=input_target_height
     )
     
