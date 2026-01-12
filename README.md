@@ -85,6 +85,54 @@ python inference.py \
 - `--enable_memory_optimizations`: Enable memory optimizations (VAE slicing, xformers)
 - `--of_rescale_factor`: Rescale factor for optical flow computation (default: 4, reduce for memory savings)
 
+## Advanced Usage: Reduced Size Processing
+
+For processing very high-resolution videos or when memory is limited, use `inference_reduced_size.py` which includes additional options:
+
+**Reduced input size processing:**
+```
+python inference_reduced_size.py \
+    --in_path 'YOUR_INPUT_PATH' \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --reduce_input_size \
+    --input_scale_factor 0.3 \
+    --batch_size 30 \
+    --of_rescale_factor 8 \
+    --enable_memory_optimizations
+```
+
+**Reduced output size processing:**
+```
+python inference_reduced_size.py \
+    --in_path 'YOUR_INPUT_PATH' \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --reduce_output_size \
+    --output_scale_factor 0.5 \
+    --batch_size 20 \
+    --enable_memory_optimizations
+```
+
+**Video-only mode (create video from existing frames):**
+```
+python inference_reduced_size.py \
+    --only_video \
+    --frames_dir '/path/to/existing/frames' \
+    --video_fps 30.0 \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --in_path 'ORIGINAL_VIDEO_FOR_AUDIO.mp4'
+```
+
+**Additional arguments for `inference_reduced_size.py`:**
+- `--reduce_input_size`: Reduce input size before processing
+- `--input_scale_factor`: Scale factor for input reduction (e.g., 0.5 for half size)
+- `--reduce_output_size`: Reduce output size after upscaling
+- `--output_scale_factor`: Scale factor for output reduction
+- `--only_video`: Only create video from existing frames (skip upscaling)
+- `--frames_dir`: Directory containing frames (required for `--only_video`)
+- `--video_width`: Output video width (optional for `--only_video`, will be detected from first frame)
+- `--video_height`: Output video height (optional for `--only_video`, will be detected from first frame)
+- `--video_fps`: Output video FPS (for `--only_video`)
+
 The expected file structure for the inference input data is outlined below. The model processes individual video sequences contained within subdirectories.
 ```
 YOUR_INPUT_PATH/
@@ -148,6 +196,12 @@ The inference script has been enhanced with several memory optimization features
   - Saves individual upscaled frames as PNG files
   - Generates a final MP4 video file with preserved audio from the original video
 - Requires `ffmpeg` to be installed for audio extraction and merging
+
+### 5. Video-Only Mode
+- The `inference_reduced_size.py` script includes a `--only_video` mode that allows creating videos from existing frames without upscaling
+- Useful when you have already processed frames and want to create a video with audio
+- Automatically adjusts to frame dimensions if they don't match specified width/height
+- Preserves audio from the original video file if provided
 
 ### Technical Details of Fixes:
 1. **CUDA OOM at line 889**: Fixed by implementing batch processing to avoid upscaling all frames at once
