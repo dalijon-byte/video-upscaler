@@ -61,12 +61,16 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=10, help="Number of frames to process at once (reduce if OOM)")
     parser.add_argument("--enable_memory_optimizations", action='store_true', help="Enable memory optimizations (CPU offload, VAE slicing)")
     parser.add_argument("--of_rescale_factor", type=int, default=4, help="Rescale factor for optical flow computation (reduce for memory savings)")
+    parser.add_argument("--use_fp16", action='store_true', help="Use half-precision (FP16) for models (reduces memory usage, may improve speed)")
     return parser.parse_args()
 
-def load_component(cls, weight_path, model_id, subfolder):
+def load_component(cls, weight_path, model_id, subfolder, torch_dtype=None):
     path = weight_path if weight_path else model_id
     sub = None if weight_path else subfolder
-    return cls.from_pretrained(path, subfolder=sub)
+    kwargs = {"subfolder": sub}
+    if torch_dtype is not None:
+        kwargs["torch_dtype"] = torch_dtype
+    return cls.from_pretrained(path, **kwargs)
 
 def process_frames_in_batches(pipeline, frames, of_model, num_inference_steps, batch_size, target_path, of_rescale_factor=4):
     """Process frames in batches to avoid OOM errors."""
@@ -182,10 +186,14 @@ def main():
 
     set_seed(42)
     device = torch.device('cuda')
+    
+    # Determine dtype for FP16 support
+    torch_dtype = torch.float16 if args.use_fp16 else None
+    print(f"Using dtype: {torch_dtype}")
 
-    controlnet = load_component(ControlNetModel, args.controlnet_pretrained_weight, args.model_id, "controlnet")
-    unet = load_component(UNet2DConditionModel, args.unet_pretrained_weight, args.model_id, "unet")
-    vae = load_component(TemporalAutoencoderTiny, args.temporal_vae_pretrained_weight, args.model_id, "vae")
+    controlnet = load_component(ControlNetModel, args.controlnet_pretrained_weight, args.model_id, "controlnet", torch_dtype)
+    unet = load_component(UNet2DConditionModel, args.unet_pretrained_weight, args.model_id, "unet", torch_dtype)
+    vae = load_component(TemporalAutoencoderTiny, args.temporal_vae_pretrained_weight, args.model_id, "vae", torch_dtype)
     scheduler = DDIMScheduler.from_pretrained(args.model_id, subfolder="scheduler")
 
     tensorrt_kwargs = {
@@ -194,13 +202,20 @@ def main():
         "image_width": args.image_width,
     } if args.enable_tensorrt else {"custom_pipeline": None}
     
+    pipeline_kwargs = {
+        "controlnet": controlnet,
+        "vae": vae,
+        "unet": unet,
+        "scheduler": scheduler,
+        **tensorrt_kwargs
+    }
+    
+    if torch_dtype is not None:
+        pipeline_kwargs["torch_dtype"] = torch_dtype
+    
     pipeline = StreamDiffVSRPipeline.from_pretrained(
         args.model_id,
-        controlnet=controlnet, 
-        vae=vae, 
-        unet=unet, 
-        scheduler=scheduler,
-        **tensorrt_kwargs
+        **pipeline_kwargs
     )
 
     if args.enable_tensorrt:
@@ -220,7 +235,12 @@ def main():
         pipeline.enable_xformers_memory_efficient_attention()
     
     of_model = raft_large(weights=Raft_Large_Weights.DEFAULT).to(device).eval()
-    of_model.requires_grad_(False) 
+    of_model.requires_grad_(False)
+    
+    # Convert optical flow model to FP16 if requested
+    if args.use_fp16:
+        print("Converting optical flow model to FP16...")
+        of_model = of_model.half()
     
     # Check if input is a video file or directory
     if os.path.isfile(args.in_path):
