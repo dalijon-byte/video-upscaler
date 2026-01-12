@@ -48,13 +48,43 @@ def get_flow(of_model, target, source, rescale_factor=1):
     if rescale_factor != 1:
         target_down = F.interpolate(target, scale_factor=1/rescale_factor, mode='bilinear', align_corners=False)
         source_down = F.interpolate(source, scale_factor=1/rescale_factor, mode='bilinear', align_corners=False)
+        
+        # Check if dimensions are divisible by 8 (RAFT requirement)
+        _, _, H, W = target_down.shape
+        if H % 8 != 0 or W % 8 != 0:
+            # Pad to make divisible by 8
+            pad_h = (8 - H % 8) % 8
+            pad_w = (8 - W % 8) % 8
+            target_down = F.pad(target_down, (0, pad_w, 0, pad_h), mode='reflect')
+            source_down = F.pad(source_down, (0, pad_w, 0, pad_h), mode='reflect')
+            print(f"  Padded images from {H}x{W} to {H+pad_h}x{W+pad_w} for RAFT compatibility")
+        
         flows = of_model(target_down, source_down)
         flow = flows[-1]
+        
+        # Remove padding if we added it
+        if H % 8 != 0 or W % 8 != 0:
+            flow = flow[:, :, :H, :W]
+        
         # Scale flow back to original resolution
         flow = F.interpolate(flow, scale_factor=rescale_factor, mode='bilinear', align_corners=False) * rescale_factor
     else:
-        flows = of_model(target, source)
-        flow = flows[-1]
+        # Check if original dimensions are divisible by 8
+        _, _, H, W = target.shape
+        if H % 8 != 0 or W % 8 != 0:
+            # Pad to make divisible by 8
+            pad_h = (8 - H % 8) % 8
+            pad_w = (8 - W % 8) % 8
+            target_padded = F.pad(target, (0, pad_w, 0, pad_h), mode='reflect')
+            source_padded = F.pad(source, (0, pad_w, 0, pad_h), mode='reflect')
+            print(f"  Padded images from {H}x{W} to {H+pad_h}x{W+pad_w} for RAFT compatibility")
+            
+            flows = of_model(target_padded, source_padded)
+            flow = flows[-1]
+            flow = flow[:, :, :H, :W]  # Remove padding
+        else:
+            flows = of_model(target, source)
+            flow = flows[-1]
     
     flow = flow.permute(0, 2, 3, 1) # permute to B, H, W, 2
     return flow
