@@ -1,10 +1,24 @@
-# Stream-DiffVSR: Low-Latency Streamable Video Super-Resolution via Auto-Regressive Diffusion
+# Stream-DiffVSR: Enhanced Fork with Memory Optimizations and Video Generation
 
-**Authors:** Hau-Shiang Shiu, Chin-Yang Lin, Zhixiang Wang, Chi-Wei Hsiao, Po-Fan Yu, Yu-Chih Chen, Yu-Lun Liu
+**Forked from:** [Jamichss/Stream-DiffVSR](https://github.com/jamichss/Stream-DiffVSR)
+**Enhanced with:** Memory optimizations, CUDA OOM fixes, and automatic video generation
+
+**Original Authors:** Hau-Shiang Shiu, Chin-Yang Lin, Zhixiang Wang, Chi-Wei Hsiao, Po-Fan Yu, Yu-Chih Chen, Yu-Lun Liu
 
 <a href='https://jamichss.github.io/stream-diffvsr-project-page/'><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;
 <a href="https://huggingface.co/Jamichsu/Stream-DiffVSR"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20(v1)-blue"></a> &nbsp;
 <a href="https://arxiv.org/abs/2512.23709"><img src="https://img.shields.io/badge/arXiv-2510.12747-b31b1b.svg"></a>
+<a href="https://github.com/dalijon-byte/video-upscaler"><img src="https://img.shields.io/badge/GitHub-Fork-6e5494"></a>
+
+## 🚀 Enhanced Features
+
+This fork includes significant improvements over the original Stream-DiffVSR:
+
+- **✅ Memory Optimization**: Batch processing and VAE slicing to prevent CUDA OOM errors
+- **✅ Video Generation**: Automatic MP4 creation with preserved audio from original videos
+- **✅ Optical Flow Fix**: Fixed memory issues in RAFT optical flow computation
+- **✅ Comprehensive Testing**: Added test utilities for video generation workflows
+- **✅ Production Ready**: Enhanced for processing long videos and high-resolution content
 
 ### TODO
 
@@ -21,16 +35,16 @@ The code is based on Python 3.9, CUDA 11, and [diffusers](https://github.com/hug
 
 ### Conda setup
 ```
-git clone https://github.com/jamichss/Stream-DiffVSR.git
-cd Stream-DiffVSR
+git clone https://github.com/dalijon-byte/video-upscaler.git
+cd video-upscaler
 conda env create -f requirements.yml
 conda activate stream-diffvsr
 ```
 Users with RTX 6000 Pro or RTX 50-series GPUs may need to update their environment by following the instructions below. For more details, please refer to [Issue #10](https://github.com/jamichss/Stream-DiffVSR/issues/10). We thank [medienbueroleipzig](https://github.com/medienbueroleipzig), [tpc2233](https://github.com/tpc2233) and [b00nwin](https://github.com/b00nwin) for testing and providing the detailed instructions!
 ```
 ## Conda setup for RTX 6000 Pro / RTX 50-Series GPUs
-git clone https://github.com/jamichss/Stream-DiffVSR.git
-cd Stream-DiffVSR
+git clone https://github.com/dalijon-byte/video-upscaler.git
+cd video-upscaler
 # 1. Create conda environment
 conda create --prefix ./Diff_env python==3.10 -y
 # 2. Activate the environment
