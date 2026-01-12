@@ -3,7 +3,7 @@
 **Forked from:** [Jamichss/Stream-DiffVSR](https://github.com/jamichss/Stream-DiffVSR)
 **Enhanced with:** Memory optimizations, CUDA OOM fixes, and automatic video generation
 
-**Original Authors:** Hau-Shiang Shiu, Chin-Yang Lin, Zhixiang Wang, Chi-Wei Hsiao, Po-Fan Yu, Yu-Chih Chen, Yu-Lun Liu
+**Original Authors:** Hau-Shiang Shiu, Chin-Yang Lin, Dalibor Jonic, Zhixiang Wang, Chi-Wei Hsiao, Po-Fan Yu, Yu-Chih Chen, Yu-Lun Liu
 
 <a href='https://jamichss.github.io/stream-diffvsr-project-page/'><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;
 <a href="https://huggingface.co/Jamichsu/Stream-DiffVSR"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20(v1)-blue"></a> &nbsp;
