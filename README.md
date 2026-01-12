@@ -44,6 +44,8 @@ pip install xformers==0.0.32.post2
 Pretrained models are available [here](https://huggingface.co/Jamichsu/Stream-DiffVSR). You don't need to download them explicitly as they are fetched with inference code.
 ### Inference
 You can run the inference directly using the following command. No manual download of checkpoints is required, as the inference script will automatically fetch the necessary files.
+
+**Basic usage:**
 ```
 python inference.py \
     --model_id 'Jamichsu/Stream-DiffVSR' \
@@ -51,6 +53,24 @@ python inference.py \
     --in_path 'YOUR_INPUT_PATH' \
     --num_inference_steps 4
 ```
+
+**Enhanced usage with memory optimizations and video generation:**
+```
+python inference.py \
+    --model_id 'Jamichsu/Stream-DiffVSR' \
+    --out_path 'YOUR_OUTPUT_PATH' \
+    --in_path 'YOUR_INPUT_PATH' \
+    --num_inference_steps 4 \
+    --batch_size 10 \
+    --enable_memory_optimizations \
+    --of_rescale_factor 4
+```
+
+**New command-line arguments:**
+- `--batch_size`: Number of frames to process at once (default: 10, reduce if OOM)
+- `--enable_memory_optimizations`: Enable memory optimizations (VAE slicing, xformers)
+- `--of_rescale_factor`: Rescale factor for optical flow computation (default: 4, reduce for memory savings)
+
 The expected file structure for the inference input data is outlined below. The model processes individual video sequences contained within subdirectories.
 ```
 YOUR_INPUT_PATH/
@@ -63,6 +83,13 @@ YOUR_INPUT_PATH/
 │   ├── frame_0002.png
 │   └── ...
 ```
+
+**Video file input support:** The inference script now supports direct video file input (MP4, AVI, MOV, MKV, FLV, WMV). When a video file is provided as input, the script will:
+1. Extract frames from the video
+2. Upscale the frames using Stream-DiffVSR
+3. Save individual upscaled frames as PNG files
+4. Generate a final MP4 video file with preserved audio from the original video
+
 For additional acceleration using NVIDIA TensorRT, please execute the following command. Please note that utilizing TensorRT may introduce a slight degradation in the output quality while providing significant performance gains. Parameters image_height and image_width are required when using tensorRT; otherwise, they are not needed.
 
 **Note:** **TensorRT** is mainly for speed/throughput, while **xFormers** helps reduce GPU memory usage. They are currently not compatible, so xFormers-based memory optimizations are unavailable when TensorRT is enabled, which may significantly increase GPU memory usage and lead to OOM issues at higher resolutions.
@@ -79,6 +106,52 @@ python inference.py \
 ```
 
 When executing the TensorRT command for the first time with a new output resolution, you may observe that the process takes an extended period to build the dedicated TensorRT engine. We kindly ask for your patience. Please note that this engine compilation is a one-time setup step for that specific resolution, essential for enabling subsequent accelerated inference at the same setting.
+
+## Memory Optimization and CUDA OOM Solutions
+
+The inference script has been enhanced with several memory optimization features to handle CUDA out of memory (OOM) errors, especially when processing long videos or high-resolution content:
+
+### 1. Batch Processing
+- Added `--batch_size` parameter to process frames in manageable chunks
+- Default batch size is 10 frames, but can be reduced for memory-constrained GPUs
+- Prevents the pipeline from attempting to upscale all frames simultaneously
+
+### 2. Memory Optimizations
+- Added `--enable_memory_optimizations` flag to enable:
+  - **VAE slicing**: Processes the VAE in slices to reduce memory usage
+  - **xFormers memory-efficient attention**: Optimizes attention mechanism memory usage
+- These optimizations are automatically disabled when TensorRT is enabled (incompatible)
+
+### 3. Optical Flow Memory Optimization
+- Added `--of_rescale_factor` parameter (default: 4)
+- Reduces memory usage during RAFT optical flow computation by downsampling images before flow computation
+- The `get_flow()` function in `util/flow_utils.py` has been fixed to properly apply rescaling before passing images to the RAFT model
+
+### 4. Video Generation with Audio
+- When processing video files, the script now automatically:
+  - Extracts frames from the input video
+  - Processes frames with memory optimizations
+  - Saves individual upscaled frames as PNG files
+  - Generates a final MP4 video file with preserved audio from the original video
+- Requires `ffmpeg` to be installed for audio extraction and merging
+
+### Technical Details of Fixes:
+1. **CUDA OOM at line 889**: Fixed by implementing batch processing to avoid upscaling all frames at once
+2. **RAFT optical flow OOM**: Fixed by adding `of_rescale_factor` parameter and correcting the `get_flow()` function to downsample images before flow computation
+3. **Video output**: Added `create_video_from_frames()` function to generate final video with audio
+
+## Accelerating the Upscaling Process
+
+To accelerate the upscaling process, you have several options:
+
+1. **TensorRT** (`--enable_tensorrt`): Provides significant speed/throughput gains but may reduce quality slightly
+2. **Memory optimizations** (`--enable_memory_optimizations`): Allows processing larger batches or higher resolutions without OOM errors
+3. **Batch size tuning** (`--batch_size`): Adjust based on your GPU memory capacity
+4. **Optical flow rescaling** (`--of_rescale_factor`): Reduces memory usage during optical flow computation
+
+**Note:** TensorRT and xFormers memory optimizations are currently incompatible. Choose based on your priority:
+- For maximum speed: Use TensorRT (but be aware of potential OOM at high resolutions)
+- For memory efficiency: Use xFormers memory optimizations (but without TensorRT acceleration)
 
 ## Citation
 

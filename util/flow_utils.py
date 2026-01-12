@@ -44,9 +44,18 @@ def warp_error(of_model, current_frame, prev_frame, current_gt, prev_gt, use_occ
     return mean_error
 
 def get_flow(of_model, target, source, rescale_factor=1):
-    flows = of_model(target, source)
-    flow = flows[-1]
-    flow = F.interpolate(flow//rescale_factor, scale_factor=1/rescale_factor, mode='bilinear') if rescale_factor != 1 else flow
+    # Downsample images before flow computation to save memory
+    if rescale_factor != 1:
+        target_down = F.interpolate(target, scale_factor=1/rescale_factor, mode='bilinear', align_corners=False)
+        source_down = F.interpolate(source, scale_factor=1/rescale_factor, mode='bilinear', align_corners=False)
+        flows = of_model(target_down, source_down)
+        flow = flows[-1]
+        # Scale flow back to original resolution
+        flow = F.interpolate(flow, scale_factor=rescale_factor, mode='bilinear', align_corners=False) * rescale_factor
+    else:
+        flows = of_model(target, source)
+        flow = flows[-1]
+    
     flow = flow.permute(0, 2, 3, 1) # permute to B, H, W, 2
     return flow
 
